@@ -1,0 +1,98 @@
+{
+  "analysis": {
+    "analyzer": {
+      "autocomplete": {
+        "_comment": "Анализатор: Индексация префиксного поиска",
+        "tokenizer": "default",
+        "filter": [ "lowercase", "noyo", "prefix" ]
+      },
+      "autocomplete_search": {
+        "_comment": "Анализатор: Префиксный поиск",
+        "tokenizer": "default",
+        "filter": [ "lowercase", "noyo" ]
+      },
+      "id": {
+        "_comment": "Анализатор: Индексация поиска идентификаторов",
+        "tokenizer": "keyword",
+        "filter": [ "lowercase", "infix" ]
+      },
+      "id_search": {
+        "_comment": "Анализатор: Поиск идентификаторов",
+        "tokenizer": "keyword",
+        "filter": [ "lowercase" ]
+      },
+      "venum": {
+        "_comment": "Анализатор: Индексация поиска номеров машин",
+        "char_filter": [ "squeeze" ],
+        "tokenizer": "keyword",
+        "filter": [ "lowercase", "infix" ]
+      },
+      "venum_search": {
+        "_comment": "Анализатор: Поиск номеров машин",
+        "char_filter": [ "squeeze" ],
+        "tokenizer": "keyword",
+        "filter": [ "lowercase" ]
+      },
+      "email": {
+        "_comment": "Анализатор: Индексация поиска email",
+        "tokenizer": "email",
+        "filter": [ "email", "lowercase", "infix" ]
+      },
+      "email_search": {
+        "_comment": "Анализатор: Поиск email",
+        "tokenizer": "keyword",
+        "filter": [ "lowercase" ]
+      }
+    },
+    "char_filter": {
+      "squeeze": {
+        "_comment": "Символьный фильтр: Удаление всех пробелов из строки",
+        "type": "pattern_replace",
+        "pattern": "\\s+",
+        "replacement": ""
+      }
+    },
+    "tokenizer": {
+      "default": {
+        "_comment": "Токенизатор: Разбиение на токены из букв и цифр",
+        "type": "pattern",
+        "pattern": "[^0-9A-Za-zА-Яа-яЁё]+"
+      },
+      "email": {
+        "_comment": "Токенизатор: Разбиение на email-токены",
+        "type": "pattern",
+        "pattern": "\\S+@\\S+",
+        "group": 0
+      }
+    },
+    "filter": {
+      "prefix": {
+        "_comment": "Токен-фильтр: Edge N-gram для префиксного поиска",
+        "type": "edge_ngram",
+        "min_gram": 1,
+        "max_gram": 20,
+        "token_chars": [ "letter", "digit" ]
+      },
+      "infix": {
+        "_comment": "Токен-фильтр: N-gram для инфиксного поиска",
+        "type": "ngram",
+        "min_gram": 1,
+        "max_gram": 15,
+        "token_chars": [ "letter", "digit" ]
+      },
+      "noyo": {
+        "_comment": "Токен-фильтр: Приравнивание 'ё' к 'е'",
+        "type": "pattern_replace",
+        "pattern": "(?i)ё",
+        "replacement": "е"
+      },
+      "email": {
+        "_comment": "Токен-фильтр: Отсечение хвоста email",
+        "type": "pattern_replace",
+        "pattern": "@.*$",
+        "replacement": ""
+      }
+    }
+  },
+  "max_ngram_diff": 20
+}

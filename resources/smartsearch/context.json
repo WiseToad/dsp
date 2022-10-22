@@ -1,0 +1,237 @@
+[
+  {
+    "_comment": [
+      "Контекст: КП",
+      "Ключ результата: ID КП"
+    ],
+    "entityName": "dsp_ContainerArea",
+    "indexAlias": "containerarea",
+    "attributes": [
+      {
+        "attributeName": "address.view",
+        "valueType": "autocomplete"
+      },
+      {
+        "attributeName": "lkCode",
+        "valueType": "id"
+      }
+    ],
+    "tags": [
+      "region.id"
+    ],
+    "permittedRegionTags": [
+      "region.id"
+    ]
+  },
+  {
+    "_comment": [
+      "Контекст: КГ с детализацией по taskDetail.task.vehicle, taskDetail.task.carrier, taskDetail.task.region",
+      "Ключ результата (составной): ID КГ, ID ТС ПЗ, ID перевозчика ПЗ, ID участка ПЗ"
+    ],
+    "contextName": "dsp_ContainerGroup(taskDetail.task[vehicle,carrier,region])",
+    "indexAlias": "containergroup-taskdetail-task",
+    "attributes": [
+      {
+        "attributeName": "address.view",
+        "valueType": "autocomplete"
+      },
+      {
+        "attributeName": "lkCode",
+        "valueType": "id"
+      }
+    ],
+    "tags": [
+      "taskDetail.task.carrier.id",
+      "taskDetail.task.region.id",
+      "taskDetail.task.startDate"
+    ],
+    "permittedCarrierTags": [
+      "taskDetail.task.carrier.id"
+    ],
+    "permittedRegionTags": [
+      "taskDetail.task.region.id"
+    ]
+  },
+  {
+    "_comment": [
+      "Контекст: КГ",
+      "Ключ результата: ID КГ"
+    ],
+    "entityName": "dsp_ContainerGroup",
+    "indexAlias": "containergroup",
+    "attributes": [
+      {
+        "attributeName": "address.view",
+        "valueType": "autocomplete"
+      },
+      {
+        "attributeName": "lkCode",
+        "valueType": "id"
+      }
+    ],
+    "tags": [
+      "region.id"
+    ],
+    "permittedRegionTags": [
+      "region.id"
+    ]
+  },
+  {
+    "_comment": [
+      "Контекст: Сотрудник",
+      "Ключ результата: ID сотрудника"
+    ],
+    "entityName": "dsp_Employee",
+    "indexAlias": "employee",
+    "attributes": [
+      {
+        "attributeName": "email",
+        "valueType": "email"
+      },
+      {
+        "attributeName": "person.fullName",
+        "valueType": "autocomplete"
+      }
+    ],
+    "tags": [
+      "user.authority.name"
+    ]
+  },
+  {
+    "_comment": [
+      "Контекст: Планшет",
+      "Ключ результата: ID планшета"
+    ],
+    "entityName": "dsp_MobileClientDevice",
+    "indexAlias": "mobileclientdevice",
+    "attributes": [
+      {
+        "attributeName": "id",
+        "valueType": "id"
+      }
+    ]
+  },
+  {
+    "_comment": [
+      "Контекст: Маршрут с детализацией по routeDetail.group",
+      "Ключ результата (составной): ID маршрута, ID КГ"
+    ],
+    "contextName": "dsp_Route(routeDetail.group)",
+    "indexAlias": "route-routedetail-group",
+    "attributes": [
+      {
+        "attributeName": "routeDetail.group.address.view",
+        "valueType": "autocomplete"
+      },
+      {
+        "attributeName": "routeDetail.group.lkCode",
+        "valueType": "id"
+      }
+    ],
+    "tags": [
+      "carrier.id",
+      "region.id"
+    ],
+    "permittedCarrierTags": [
+      "carrier.id"
+    ],
+    "permittedRegionTags": [
+      "region.id"
+    ]
+  },
+  {
+    "_comment": [
+      "Контекст: Маршрут",
+      "Ключ результата: ID маршрута"
+    ],
+    "entityName": "dsp_Route",
+    "indexAlias": "route",
+    "attributes": [
+      {
+        "attributeName": "name",
+        "valueType": "autocomplete"
+      }
+    ],
+    "tags": [
+      "carrier.id",
+      "region.id"
+    ],
+    "permittedCarrierTags": [
+      "carrier.id"
+    ],
+    "permittedRegionTags": [
+      "region.id"
+    ]
+  },
+  {
+    "_comment": [
+      "Контекст: ПЗ",
+      "Ключ результата: ID ПЗ"
+    ],
+    "entityName": "dsp_Task",
+    "indexAlias": "task",
+    "attributes": [
+      {
+        "attributeName": "driver.person.fullName",
+        "valueType": "autocomplete"
+      },
+      {
+        "attributeName": "vehicle.garageNumber",
+        "valueType": "venum"
+      },
+      {
+        "attributeName": "vehicle.number.withoutRegion",
+        "valueType": "venum"
+      }
+    ],
+    "tags": [
+      "carrier.id",
+      "region.id",
+      "startDate"
+    ],
+    "permittedCarrierTags": [
+      "carrier.id"
+    ],
+    "permittedRegionTags": [
+      "region.id"
+    ]
+  },
+  {
+    "_comment": [
+      "Контекст: ТС",
+      "Ключ результата: ID ТС"
+    ],
+    "entityName": "dsp_Vehicle",
+    "indexAlias": "vehicle",
+    "attributes": [
+      {
+        "attributeName": "garageNumber",
+        "valueType": "venum"
+      },
+      {
+        "attributeName": "number.withoutRegion",
+        "valueType": "venum"
+      }
+    ],
+    "tags": [
+      "owner.id"
+    ],
+    "permittedCarrierTags": [
+      "owner.id"
+    ]
+  },
+  {
+    "_comment": [
+      "Контекст: Верификация",
+      "Ключ результата: ID верификации"
+    ],
+    "entityName": "dsp_Verification",
+    "indexAlias": "verification",
+    "attributes": [
+      {
+        "attributeName": "address",
+        "valueType": "autocomplete"
+      }
+    ]
+  }
+]

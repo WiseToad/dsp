@@ -1,0 +1,17 @@
+[
+  {
+    "reportName": "VolumeReport",
+    "reportTitle": "Отчет по объемам",
+    "exportTitle": "Отчет по объемам с $dateFrom по $dateTo",
+    "templateName": "volume.xlsx",
+    "dataFetcher": "VolumeReportFetcher",
+    "convertParams": {
+      "HTML": {
+        "maxRowCount": 106
+      },
+      "PDF": {
+        "isLandscape": true
+      }
+    }
+  }
+]

@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-mappings
+    xmlns="http://xmlns.jcp.org/xml/ns/persistence/orm"
+    version="2.2">
+
+    <named-native-query name="VolumeReport.fetch" result-set-mapping="VolumeDTO">
+        <query><![CDATA[
+            select container_group_id,
+                parent_region_name,
+                region_name,
+                container_area_code,
+                address,
+                owner_company_name,
+                case when removal_only_kgo then 'КГО' else cast(amount as varchar) end as amount,
+                case when removal_only_kgo then '-' else cast(volume as varchar) end as volume,
+                trips_per_day,
+                schedule,
+                array_agg(removal_date_app_tz_trunc order by removal_date_app_tz_trunc) as removal_date_app_tz_truncs,
+                array_agg(fact_amount order by removal_date_app_tz_trunc) as fact_amounts,
+                array_agg(fact_amount * coalesce(volume, 0.0) + picked_up order by removal_date_app_tz_trunc) as fact_volumes,
+                cast(sum(fact_amount) as integer) as fact_amount_total,
+                sum(fact_amount * coalesce(volume, 0.0) + picked_up) as fact_volume_total,
+                string_agg(distinct fail_reasons, chr(10) order by fail_reasons) as fail_reasons,
+                tariff
+            from (
+                select cg.id as container_group_id,
+                    cg.parent_region_name,
+                    cg.region_name,
+                    cg.container_area_code,
+                    cg.address,
+                    cg.owner_company_name,
+                    cg.amount,
+                    cg.volume,
+                    cg.trips_per_day,
+                    cg.schedule,
+                    rm.removal_date_app_tz_trunc,
+                    (cg.entity_name = 'dsp_ContainerArea' and rm.removal_only_kgo) as removal_only_kgo,
+                    coalesce(cast(sum(rm.fact_amount) as integer), 0) as fact_amount,
+                    coalesce(sum(rm.picked_up), 0.0) as picked_up,
+                    string_agg(distinct rm.fail_reasons, chr(10) order by rm.fail_reasons) as fail_reasons,
+                    cg.tariff as tariff
+                from dsp_container_group_dim as cg
+                    left join dsp_container_group_removal_fct as rm on rm.container_group_id = cg.id
+                where rm.removal_date_app_tz_trunc between :dateAppTzFrom and :dateAppTzTo
+                    and rm.carrier_id = any (coalesce(:carrierIds, array[rm.carrier_id]))
+                    and cg.region_id = any (coalesce(:regionIds, array[cg.region_id]))
+                group by cg.id,
+                    rm.removal_date_app_tz_trunc,
+                    (cg.entity_name = 'dsp_ContainerArea' and rm.removal_only_kgo)
+            ) as q
+            group by container_group_id,
+                parent_region_name,
+                region_name,
+                container_area_code,
+                address,
+                owner_company_name,
+                removal_only_kgo,
+                amount,
+                volume,
+                trips_per_day,
+                schedule,
+                tariff
+            order by parent_region_name,
+                region_name,
+                address
+        ]]></query>
+    </named-native-query>
+
+    <named-native-query name="VolumeReport.precalcContainerGroupDim">
+        <query><![CDATA[
+            truncate table dsp_container_group_dim;
+
+            insert into dsp_container_group_dim
+            select * from dsp_container_group_dim_vw;
+
+            analyze dsp_container_group_dim;
+        ]]></query>
+    </named-native-query>
+
+    <named-native-query name="VolumeReport.precalcContainerGroupRemovalFct">
+        <query><![CDATA[
+            delete from dsp_container_group_removal_fct as t
+            where t.removal_date_app_tz_trunc >= date_trunc('day', now() at time zone :appTz - interval '30 days');
+
+            insert into dsp_container_group_removal_fct as t
+            select * from get_container_group_removal_fct(:appTz, now() at time zone :appTz - interval '30 days') as s;
+
+            analyze dsp_container_group_removal_fct;
+        ]]></query>
+    </named-native-query>
+
+    <named-native-query name="ChangeRequestCustomRepositoryImpl.findNonPropagated"
+                        result-class="com.groupstp.dsp.domain.entity.changerequest.ChangeRequest">
+        <query><![CDATA[
+            -- обратный обход дерева - отбор только корневых узлов, имеющих потомков в нужном статусе
+            with recursive change_request_2 as (
+                -- прямой обход дерева - сбор узлов, находящихся в нужном статусе, по всем уровням иерархии
+                with recursive change_request_1 as (
+                    select cr.id,
+                        cast(null as uuid) as parent_id,
+                        cr.decision_mode,
+                        cr.decision
+                    from dsp_change_request as cr
+                    where cr.parent_attribute_id is null
+                        and entity_name = :entityName
+                        and case when :instanceId is not null
+                            then cr.instance_id = :instanceId
+                            else cr.operation = 'INSERT'
+                        end
+                    union
+                    -- порция дочерних узлов
+                    select cr.id,
+                        pr.id as parent_id,
+                        cr.decision_mode,
+                        cr.decision
+                    from dsp_change_request as cr
+                        join dsp_change_request_attribute as pa on cr.parent_attribute_id = pa.id
+                        join change_request_1 as pr on pa.change_request_id = pr.id
+                )
+                select cr.id,
+                    cr.parent_id
+                from change_request_1 as cr
+                -- отбор по нужному статусу: запрос или его атрибуты ожидают решения, либо отклонены
+                where (cr.decision_mode is not null and cr.decision is null)
+                    or (cr.decision = 'DENIED')
+                    or exists (
+                        select null from dsp_change_request_attribute as ca
+                        where ca.change_request_id = cr.id and (
+                            (ca.decision_mode is not null and ca.decision is null)
+                            or (ca.decision = 'DENIED')
+                        )
+                    )
+                union
+                -- порция родительских узлов
+                select pr.id,
+                    pa.change_request_id as parent_id -- родитель родителя
+                from dsp_change_request as pr
+                    join change_request_2 as cr on pr.id = cr.parent_id
+                    left join dsp_change_request_attribute as pa on pr.parent_attribute_id = pa.id
+            )
+            select cr.*
+            from dsp_change_request as cr
+            where cr.id = any (
+                select distinct cr.id
+                from change_request_2 as cr
+                where cr.parent_id is null
+            )
+        ]]></query>
+    </named-native-query>
+
+    <sql-result-set-mapping name="VolumeDTO">
+        <constructor-result target-class="com.groupstp.dsp.reporting.fetch.volume.VolumeDTO">
+            <column name="container_group_id" class="org.hibernate.type.PostgresUUIDType"/>
+            <column name="parent_region_name"/>
+            <column name="region_name"/>
+            <column name="container_area_code"/>
+            <column name="address"/>
+            <column name="owner_company_name"/>
+            <column name="amount"/>
+            <column name="volume"/>
+            <column name="trips_per_day"/>
+            <column name="schedule"/>
+            <column name="removal_date_app_tz_truncs" class="com.groupstp.dsp.hibernate.DateArrayType"/>
+            <column name="fact_amounts" class="com.groupstp.dsp.hibernate.IntArrayType"/>
+            <column name="fact_volumes" class="com.groupstp.dsp.hibernate.DoubleArrayType"/>
+            <column name="fact_amount_total"/>
+            <column name="fact_volume_total"/>
+            <column name="fail_reasons"/>
+            <column name="tariff"/>
+        </constructor-result>
+    </sql-result-set-mapping>
+
+    <sql-result-set-mapping name="SmartSearchDbRecord">
+        <constructor-result target-class="com.groupstp.dsp.smartsearch.service.dto.storage.SmartSearchDbRecord">
+            <column name="key"/>
+            <column name="search_values" class="com.groupstp.dsp.hibernate.StringArrayType"/>
+            <column name="display_values" class="com.groupstp.dsp.hibernate.StringArrayType"/>
+            <column name="is_archive"/>
+            <column name="tags" class="com.groupstp.dsp.hibernate.StringArrayType"/>
+        </constructor-result>
+    </sql-result-set-mapping>
+
+</entity-mappings>

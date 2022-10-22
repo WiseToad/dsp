@@ -1,0 +1,98 @@
+enum ChangeRequestDecisionMode {
+    ACCEPT
+    DENY
+    APPROVE
+    LK_APPROVE
+}
+
+enum ChangeRequestDecision {
+    ACCEPTED
+    DENIED
+}
+
+enum ChangeRequestSource {
+    UI
+    VERIFICATION
+}
+
+enum ChangeRequestOperation {
+    INSERT
+    UPDATE
+    DELETE
+}
+
+input ChangeRequestInput {
+    operation: ChangeRequestOperation!,
+    entityName: String!,
+    instanceKey: Object,
+    attributes: [ChangeRequestAttributeInput!],
+    reason: String
+}
+
+type ChangeRequest {
+    id: ID!,
+    decisionMode: ChangeRequestDecisionMode,
+    decision: ChangeRequestDecision,
+    decisionTs: Date,
+    decidedBy: String,
+    source: ChangeRequestSource!,
+    operation: ChangeRequestOperation!,
+    entityName: String!,
+    instanceKey: Object,
+    attributes: [ChangeRequestAttribute!],
+    reason: String,
+    requestTs: Date!,
+    requestedBy: String
+}
+
+input ChangeRequestAttributeInput {
+    name: String!,
+    value: Object
+}
+
+type ChangeRequestAttribute {
+    id: ID!,
+    decisionMode: ChangeRequestDecisionMode,
+    decision: ChangeRequestDecision,
+    decisionTs: Date,
+    decidedBy: String,
+    name: String!,
+    value: Object,
+    valueString: String!
+}
+
+input ChangeRequestDecisionInput {
+    id: UUID!,
+    decision: ChangeRequestDecision!
+}
+
+extend type Query {
+
+    """
+    Найти запрос на изменение по его ID
+    """
+    findChangeRequestById(id: UUID!): ChangeRequest
+
+    """
+    Найти запросы на изменение с непроведенными изменениями по ID экземпляра
+    """
+    findNonPropagatedChangeRequestsByInstanceId(entityName: String!, instanceId: UUID!): [ChangeRequest!]!
+
+    """
+    Найти запросы на добавление с непроведенными изменениями
+    """
+    findNonPropagatedChangeRequestsByInsertOperation(entityName: String!): [ChangeRequest!]!
+}
+
+extend type Mutation {
+
+    """
+    Создать запрос на изменение
+    """
+    createChangeRequest(changeRequest: ChangeRequestInput!): ChangeRequest!
+
+    """
+    Зафиксировать принятые решения по изменениям
+    """
+    setDecisions(decisions: [ChangeRequestDecisionInput!]!): Void
+}

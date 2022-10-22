@@ -1,0 +1,56 @@
+input SmartSearchTag {
+    name: String!,
+    values: [String!]!
+}
+
+input SmartSearchRealm {
+    contextName: String,
+    entityName: String,
+    attributeNames: [String!]!,
+    isArchive: Boolean,
+    tags: [SmartSearchTag!]
+}
+
+type SmartSearchInstance {
+    instanceId: UUID!,
+    contextName: String!,
+    entityName: String!,
+    attributeName: String!,
+    displayValue: String,
+    isArchive: Boolean!
+}
+
+type SmartSearchResult {
+    key: String!,
+    contextName: String!,
+    attributeName: String!,
+    displayValue: String,
+    isArchive: Boolean!
+}
+
+extend type Query {
+    """
+    " Выполнить поиск экземпляров сущностей по заданным критериям.
+    "
+    " Оставлено для обратной совместимости. Теперь во всех случаях должен использоваться более общий метод smartFind.
+    " В аргументах допускается задавать как сущности, так и поисковые контексты.
+    """
+    findInstances(realms: [SmartSearchRealm!]!,
+                  isArchive: Boolean,
+                  tags: [SmartSearchTag!],
+                  searchValue: String,
+                  limit: Int
+    ): [SmartSearchInstance!]!
+
+    """
+    " Выполнить обобщенный поиск по заданным критериям.
+    "
+    " В аргументах допускается задавать только поисковые контексты. Более узкого понятия сущности здесь как такового нет.
+    """
+    smartFind(realms: [SmartSearchRealm!]!,
+              isArchive: Boolean,
+              tags: [SmartSearchTag!],
+              searchValue: String,
+              limit: Int
+    ): [SmartSearchResult!]!
+}
