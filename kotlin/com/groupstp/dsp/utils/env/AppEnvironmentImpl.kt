@@ -1,0 +1,142 @@
+package com.groupstp.dsp.config.env
+
+import com.groupstp.dsp.domain.utils.AppIoUtils
+import com.groupstp.dsp.repository.ConfigPropertyRepository
+import org.slf4j.LoggerFactory
+import org.springframework.core.convert.ConversionException
+import org.springframework.core.env.ConfigurableEnvironment
+import org.springframework.stereotype.Component
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.*
+import kotlin.io.path.exists
+
+/**
+ * Реализация концепции настроек приложения, изменяемых в рантайме.
+ *
+ * Изменения настроек сразу же сохраняются в файл, соответственно выживают между перезапусками приложения.
+ * Особенности реализации:
+ * - В отличие от стандартного Environment, ошибки конвертации значения в нужный тип в методах getProperty
+ *   проглатываются (с выводом в лог) и на выход возвращается null, как будто настройка вообще не задана.
+ *   Так сделано для совместимости с прошлым механизмом DbConfigService.
+ * Недостатки реализации:
+ * - В один момент времени возможно только одно изменение, даже если инициаторы меняют совершенно разные настройки.
+ * - После каждого изменения сохраняется весь пул динамических настроек, даже если была изменена самая маленькая
+ *   настройка в мире.
+ */
+
+//TODO: После перевода ВСЕХ баз на AppEnvironment:
+//      - удалить код, помеченный как "temporary code", избавиться от любого использования configPropertyRepository
+//      - через миграцию удалить динамическую настройку app.disable-db-config
+//      - удалить файлы с кодом com.groupstp.dsp.service.DbConfigService и com.groupstp.dsp.service.DbConfigService
+
+@Component
+class AppEnvironmentImpl(
+    private val env: ConfigurableEnvironment,
+    configPropertyRepository: ConfigPropertyRepository
+): AppEnvironment {
+
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    private val dynamicPropertiesPath: Path
+    private val dynamicProperties = Properties()
+
+    init {
+        val configDir = File(env.getProperty("app.home"), "config").apply {
+            mkdirs()
+        }
+        dynamicPropertiesPath = File(configDir, "dynamic.properties").toPath()
+
+        if(dynamicPropertiesPath.exists()) {
+            AppIoUtils.loadAll(Files.newInputStream(dynamicPropertiesPath)) { inputStream ->
+                dynamicProperties.load(inputStream)
+            }
+        }
+        env.propertySources.addFirst(StandardPropertySource("dynamicProperties", dynamicProperties))
+
+        // temporary code:
+        if(!env.getProperty("app.disable-db-config", Boolean::class.java, false)) {
+            env.propertySources.addAfter("dynamicProperties",
+                DbPropertySource("dbProperties", configPropertyRepository)
+            )
+        }
+    }
+
+    override fun containsProperty(key: String): Boolean =
+        env.containsProperty(key)
+
+    override fun getProperty(key: String): String? =
+        env.getProperty(key)
+
+    override fun getProperty(key: String, defaultValue: String): String =
+        env.getProperty(key, defaultValue)
+
+    override fun <T> getProperty(key: String, targetType: Class<T>): T? =
+        try { // исключения проглатываются для совместимости с поведением DbConfigService, используемого ранее
+            env.getProperty(key, targetType)
+        }
+        catch(e: ConversionException) {
+            logBadValueType(key, e)
+            null
+        }
+
+    override fun <T> getProperty(key: String, targetType: Class<T>, defaultValue: T): T =
+        try { // исключения проглатываются для совместимости с поведением DbConfigService, используемого ранее
+            env.getProperty(key, targetType, defaultValue)
+        }
+        catch(e: ConversionException) {
+            logBadValueType(key, e)
+            defaultValue
+        }
+
+    // Кастомное приведение типа настройки
+    override fun <T> getProperty(key: String, cast: (String) -> T): T? =
+        getProperty(key)?.let {
+            try {
+                cast(it)
+            } catch(e: Exception) {
+                logBadValueType(key, e)
+                null
+            }
+        }
+
+    private fun logBadValueType(key: String, t: Throwable) {
+        log.warn("Неверный тип значения настройки $key", t)
+    }
+
+    override fun setProperty(key: String, value: Any?) {
+        synchronized(dynamicProperties) {
+            dynamicProperties.setProperty(key, value?.toString())
+            saveDynamicProperties()
+        }
+    }
+
+    override fun removeDynamicProperty(key: String) {
+        synchronized(dynamicProperties) {
+            dynamicProperties.remove(key)
+            saveDynamicProperties()
+        }
+    }
+
+    private fun saveDynamicProperties() {
+        AppIoUtils.saveAll(Files.newOutputStream(dynamicPropertiesPath)) { outputStream ->
+            dynamicProperties.store(outputStream, """
+                    Dynamically specified application properties.
+                    Do not edit this file by hand while application is running!
+                    Use provided administrative REST interface instead.
+                """.trimIndent())
+        }
+    }
+
+    override fun containsDynamicProperty(key: String): Boolean =
+        dynamicProperties.containsKey(key)
+
+    override fun getDynamicPropertyKeys(): List<String> {
+        return mutableListOf<String>().apply {
+            for(propertyName in dynamicProperties.propertyNames()) {
+                add(propertyName.toString())
+            }
+        }
+    }
+}
