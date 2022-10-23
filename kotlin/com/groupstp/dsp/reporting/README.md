@@ -1,1 +1,1 @@
-См. также [ресурсный каталог](/resources/reporting)
+См. также [ресурсный каталог](/resources/reporting).
