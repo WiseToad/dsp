@@ -1,1 +1,1 @@
-См. также [каталог с кодом](../../kotlin/com/groupstp/dsp/reporting).
+См. также [каталог с кодом](/kotlin/com/groupstp/dsp/reporting).
